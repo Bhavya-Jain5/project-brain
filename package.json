@@ -1,0 +1,28 @@
+{
+  "name": "project-brain",
+  "version": "1.0.0",
+  "description": "Personal MCP server — Claude's persistent memory across conversations",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:stdio": "node dist/index.js --stdio",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "better-sqlite3-multiple-ciphers": "^12.6.2",
+    "dotenv": "^16.4.0",
+    "express": "^5.2.1",
+    "nanoid": "^5.1.6",
+    "rate-limiter-flexible": "^9.1.1",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
