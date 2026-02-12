@@ -9,11 +9,11 @@ export function registerEntityTools(server: McpServer): void {
   // create_entity
   server.tool(
     "create_entity",
-    "Create a new entity (project, person, system, module, concept, etc.)",
+    "Create a new entity (project, person, organization, system, module, concept, etc.)",
     {
       db: dbEnum.describe("Which database"),
       name: z.string().describe("Entity name"),
-      type: z.string().describe("Entity type: project, person, system, module, concept, ai_agent, etc."),
+      type: z.string().describe("Entity type: project, person, organization, system, module, concept, ai_agent, client, etc."),
       subtype: z.string().optional().describe("Optional refinement of type"),
       description: z.string().optional().describe("Entity description"),
       tags: z.array(z.string()).optional().describe("Tags"),

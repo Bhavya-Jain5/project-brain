@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS memories (
     status TEXT DEFAULT 'active',
     superseded_by TEXT,
     project_id TEXT,
+    importance INTEGER DEFAULT 3,
     metadata TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
@@ -76,12 +77,35 @@ CREATE TABLE IF NOT EXISTS feature_requests (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Handoffs: context bridge between Chat (decision layer) and Code (implementation layer)
+CREATE TABLE IF NOT EXISTS handoffs (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    project TEXT,
+    chat_last_seen INTEGER DEFAULT 0,
+    code_last_seen INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS handoff_entries (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    handoff_id TEXT NOT NULL REFERENCES handoffs(id),
+    from_client TEXT NOT NULL,
+    type TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_handoff_entries_handoff ON handoff_entries(handoff_id);
 CREATE INDEX IF NOT EXISTS idx_claude_notes_source ON claude_notes(source);
 CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
 CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project_id);
 CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
 CREATE INDEX IF NOT EXISTS idx_memories_source ON memories(source);
+CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance);
 CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type);
 CREATE INDEX IF NOT EXISTS idx_entities_status ON entities(status);
 CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_type, source_id);
@@ -199,6 +223,18 @@ CREATE TABLE IF NOT EXISTS module_usage (
 );
 `;
 
+function columnExists(db: BetterSqlite3.Database, tableName: string, columnName: string): boolean {
+  const columns = db.pragma(`table_info(${tableName})`) as { name: string }[];
+  return columns.some(c => c.name === columnName);
+}
+
+function runMigrations(db: BetterSqlite3.Database): void {
+  // Migration: add importance column to memories (v1.1)
+  if (tableExists(db, "memories") && !columnExists(db, "memories", "importance")) {
+    db.exec("ALTER TABLE memories ADD COLUMN importance INTEGER DEFAULT 3");
+  }
+}
+
 function tableExists(db: BetterSqlite3.Database, tableName: string): boolean {
   const row = db.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
@@ -218,6 +254,9 @@ export function initializeSchema(dbName: DbName): void {
 
   // Run core schema (all DBs get this)
   db.exec(CORE_SCHEMA);
+
+  // Run migrations for existing databases
+  runMigrations(db);
 
   // FTS tables — check before creating since virtual tables can't use IF NOT EXISTS reliably on all versions
   if (!tableExists(db, "memories_fts")) {

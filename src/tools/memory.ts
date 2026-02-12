@@ -20,6 +20,7 @@ interface MemoryRow {
   status: string;
   superseded_by: string | null;
   project_id: string | null;
+  importance: number;
   metadata: string | null;
   created_at: string;
   updated_at: string;
@@ -48,18 +49,19 @@ export function registerMemoryTools(server: McpServer): void {
       subcategory: z.string().optional().describe("Optional refinement of category"),
       tags: z.array(z.string()).optional().describe("Tags for categorization"),
       project_id: z.string().optional().describe("Link to a project entity"),
+      importance: z.number().min(1).max(5).optional().describe("Importance level 1-5 (default: 3). 5 = foundational, 1 = minor observation"),
       metadata: z.record(z.unknown()).optional().describe("Additional metadata"),
     },
-    async ({ db: dbName, content, category, subcategory, tags, project_id, metadata }) => {
+    async ({ db: dbName, content, category, subcategory, tags, project_id, importance, metadata }) => {
       const db = getDb(dbName as DbName);
       const id = generateId("mem");
       const tagsJson = tags ? JSON.stringify(tags) : null;
       const metadataJson = metadata ? JSON.stringify(metadata) : null;
 
       db.prepare(`
-        INSERT INTO memories (id, content, category, subcategory, tags, source, project_id, metadata)
-        VALUES (?, ?, ?, ?, ?, 'claude_code', ?, ?)
-      `).run(id, content, category, subcategory ?? null, tagsJson, project_id ?? null, metadataJson);
+        INSERT INTO memories (id, content, category, subcategory, tags, source, project_id, importance, metadata)
+        VALUES (?, ?, ?, ?, ?, 'claude_code', ?, ?, ?)
+      `).run(id, content, category, subcategory ?? null, tagsJson, project_id ?? null, importance ?? 3, metadataJson);
 
       const memory = db.prepare("SELECT * FROM memories WHERE id = ?").get(id);
       return { content: [{ type: "text" as const, text: JSON.stringify(memory, null, 2) }] };
@@ -69,17 +71,20 @@ export function registerMemoryTools(server: McpServer): void {
   // get_memories
   server.tool(
     "get_memories",
-    "Get memories with optional filters (category, tags, project, status)",
+    "Get memories with optional filters (category, tags, project, status, date range, importance)",
     {
       db: dbEnum.describe("Which database to query"),
       category: z.string().optional().describe("Filter by category"),
       tags: z.array(z.string()).optional().describe("Filter by ANY of these tags"),
       project_id: z.string().optional().describe("Filter by project"),
-      status: z.string().optional().describe("Filter by status (default: active)"),
+      status: z.string().optional().describe("Filter by status: active, superseded, archived (default: active)"),
+      created_after: z.string().optional().describe("Only memories created after this datetime (ISO 8601, e.g. '2026-02-05' or '2026-02-05T14:30:00')"),
+      created_before: z.string().optional().describe("Only memories created before this datetime (ISO 8601)"),
+      min_importance: z.number().min(1).max(5).optional().describe("Minimum importance level (1-5)"),
       limit: z.number().optional().describe("Max results (default: 50)"),
       offset: z.number().optional().describe("Offset for pagination"),
     },
-    async ({ db: dbName, category, tags, project_id, status, limit, offset }) => {
+    async ({ db: dbName, category, tags, project_id, status, created_after, created_before, min_importance, limit, offset }) => {
       const db = getDb(dbName as DbName);
       const conditions: string[] = [];
       const params: unknown[] = [];
@@ -105,9 +110,21 @@ export function registerMemoryTools(server: McpServer): void {
           params.push(`%"${tag}"%`);
         }
       }
+      if (created_after) {
+        conditions.push("created_at >= ?");
+        params.push(created_after);
+      }
+      if (created_before) {
+        conditions.push("created_at <= ?");
+        params.push(created_before);
+      }
+      if (min_importance) {
+        conditions.push("importance >= ?");
+        params.push(min_importance);
+      }
 
       const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-      const sql = `SELECT * FROM memories ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`;
+      const sql = `SELECT * FROM memories ${where} ORDER BY importance DESC, updated_at DESC LIMIT ? OFFSET ?`;
       params.push(limit ?? 50, offset ?? 0);
 
       const memories = db.prepare(sql).all(...params);
@@ -126,10 +143,11 @@ export function registerMemoryTools(server: McpServer): void {
       category: z.string().optional().describe("New category"),
       subcategory: z.string().optional().describe("New subcategory"),
       tags: z.array(z.string()).optional().describe("New tags"),
-      status: z.string().optional().describe("New status"),
+      status: z.string().optional().describe("New status: active, superseded, archived"),
+      importance: z.number().min(1).max(5).optional().describe("New importance level 1-5"),
       metadata: z.record(z.unknown()).optional().describe("New metadata"),
     },
-    async ({ db: dbName, id, content, category, subcategory, tags, status, metadata }) => {
+    async ({ db: dbName, id, content, category, subcategory, tags, status, importance, metadata }) => {
       const db = getDb(dbName as DbName);
 
       // Check if memory exists and is immutable
@@ -152,6 +170,7 @@ export function registerMemoryTools(server: McpServer): void {
       if (subcategory !== undefined) { updates.push("subcategory = ?"); params.push(subcategory); }
       if (tags !== undefined) { updates.push("tags = ?"); params.push(JSON.stringify(tags)); }
       if (status !== undefined) { updates.push("status = ?"); params.push(status); }
+      if (importance !== undefined) { updates.push("importance = ?"); params.push(importance); }
       if (metadata !== undefined) { updates.push("metadata = ?"); params.push(JSON.stringify(metadata)); }
 
       if (updates.length === 0) {
@@ -196,13 +215,13 @@ export function registerMemoryTools(server: McpServer): void {
       const linkId = generateId("lnk");
 
       const transaction = db.transaction(() => {
-        // Create new memory (inherit category, subcategory, tags from old)
+        // Create new memory (inherit category, subcategory, tags, importance from old)
         db.prepare(`
-          INSERT INTO memories (id, content, category, subcategory, tags, source, project_id, metadata)
-          VALUES (?, ?, ?, ?, ?, 'claude_code', ?, ?)
+          INSERT INTO memories (id, content, category, subcategory, tags, source, project_id, importance, metadata)
+          VALUES (?, ?, ?, ?, ?, 'claude_code', ?, ?, ?)
         `).run(
           newId, new_content, oldMemory.category, oldMemory.subcategory,
-          oldMemory.tags, oldMemory.project_id,
+          oldMemory.tags, oldMemory.project_id, oldMemory.importance,
           reason ? JSON.stringify({ supersede_reason: reason }) : oldMemory.metadata
         );
 
@@ -227,6 +246,59 @@ export function registerMemoryTools(server: McpServer): void {
         content: [{
           type: "text" as const,
           text: JSON.stringify({ old: oldUpdated, new: newMemory, link_id: linkId }, null, 2),
+        }],
+      };
+    }
+  );
+
+  // bulk_save_memories
+  server.tool(
+    "bulk_save_memories",
+    "Save multiple memories in a single transaction. Essential for migrations and batch imports. Returns array of created IDs.",
+    {
+      db: dbEnum.describe("Which database to save to"),
+      memories: z.array(z.object({
+        content: z.string().describe("The memory content"),
+        category: categoryEnum.describe("Memory category"),
+        subcategory: z.string().optional().describe("Optional refinement of category"),
+        tags: z.array(z.string()).optional().describe("Tags for categorization"),
+        project_id: z.string().optional().describe("Link to a project entity"),
+        importance: z.number().min(1).max(5).optional().describe("Importance level 1-5 (default: 3)"),
+        metadata: z.record(z.unknown()).optional().describe("Additional metadata"),
+      })).min(1).max(100).describe("Array of memory objects to save (max 100)"),
+    },
+    async ({ db: dbName, memories: items }) => {
+      const db = getDb(dbName as DbName);
+      const ids: string[] = [];
+
+      const insert = db.prepare(`
+        INSERT INTO memories (id, content, category, subcategory, tags, source, project_id, importance, metadata)
+        VALUES (?, ?, ?, ?, ?, 'claude_code', ?, ?, ?)
+      `);
+
+      const transaction = db.transaction(() => {
+        for (const item of items) {
+          const id = generateId("mem");
+          ids.push(id);
+          insert.run(
+            id,
+            item.content,
+            item.category,
+            item.subcategory ?? null,
+            item.tags ? JSON.stringify(item.tags) : null,
+            item.project_id ?? null,
+            item.importance ?? 3,
+            item.metadata ? JSON.stringify(item.metadata) : null,
+          );
+        }
+      });
+
+      transaction();
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ saved: ids.length, ids }, null, 2),
         }],
       };
     }

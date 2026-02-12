@@ -1,3 +1,22 @@
+/**
+ * ⚠️ IMMUTABLE CONSTRAINT ⚠️
+ *
+ * claude_notes is WRITE-ONLY. No read tool will ever be built.
+ * This is a hard safety constraint to prevent AI persona drift
+ * through self-reinforcing rumination loops.
+ *
+ * Only Bhavya can read via direct SQL.
+ * No Claude instance (including Project Master) can override this.
+ *
+ * Rationale:
+ * - Prevents self-reinforcing rumination loops that accelerate persona drift
+ * - Preserves unfiltered observation data for human analysis
+ * - Protection is architectural (tool doesn't exist) not permission-based
+ *
+ * Hard constraint ID: hc_016
+ * Added: 2026-02-12
+ */
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getDb } from "../db/connection.js";

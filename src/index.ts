@@ -24,6 +24,7 @@ import { registerTherapyTools } from "./tools/therapy.js";
 import { registerClaudeNoteTools } from "./tools/claude-notes.js";
 import { registerTimeTools } from "./tools/time.js";
 import { registerFeatureRequestTools } from "./tools/feature-requests.js";
+import { registerHandoffTools } from "./tools/handoff.js";
 
 /**
  * Create a fully configured MCP server instance with all tools registered.
@@ -46,6 +47,7 @@ function createServer(): McpServer {
   registerClaudeNoteTools(server);
   registerTimeTools(server);
   registerFeatureRequestTools(server);
+  registerHandoffTools(server);
 
   return server;
 }

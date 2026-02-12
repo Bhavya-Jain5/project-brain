@@ -21,7 +21,7 @@ export function registerContextTools(server: McpServer): void {
       // Personality memories
       const personality = core.prepare(`
         SELECT * FROM memories WHERE category = 'personality' AND status = 'active'
-        ORDER BY updated_at DESC LIMIT 20
+        ORDER BY importance DESC, updated_at DESC LIMIT 20
       `).all();
 
       // Founding values
@@ -36,34 +36,34 @@ export function registerContextTools(server: McpServer): void {
         ORDER BY CAST(json_extract(metadata, '$.priority') AS INTEGER) ASC
       `).all();
 
-      // User facts
+      // User facts (high-importance first)
       const userFacts = core.prepare(`
         SELECT * FROM memories WHERE category = 'fact' AND status = 'active'
-        ORDER BY updated_at DESC LIMIT 20
+        ORDER BY importance DESC, updated_at DESC LIMIT 20
       `).all();
 
-      // Preferences
+      // Preferences (high-importance first)
       const preferences = core.prepare(`
         SELECT * FROM memories WHERE category = 'preference' AND status = 'active'
-        ORDER BY updated_at DESC LIMIT 20
+        ORDER BY importance DESC, updated_at DESC LIMIT 20
       `).all();
 
-      // Recent decisions across core
+      // Recent decisions (high-importance first)
       const recentDecisions = core.prepare(`
         SELECT * FROM memories WHERE category = 'decision' AND status = 'active'
-        ORDER BY updated_at DESC LIMIT 10
+        ORDER BY importance DESC, updated_at DESC LIMIT 10
       `).all();
 
-      // Recent learnings
+      // Recent learnings (high-importance first)
       const recentLearnings = core.prepare(`
         SELECT * FROM memories WHERE category = 'learning' AND status = 'active'
-        ORDER BY updated_at DESC LIMIT 5
+        ORDER BY importance DESC, updated_at DESC LIMIT 5
       `).all();
 
-      // Active blockers from core
+      // Active blockers (high-importance first)
       const activeBlockers = core.prepare(`
         SELECT * FROM memories WHERE category = 'blocker' AND status = 'active'
-        ORDER BY updated_at DESC
+        ORDER BY importance DESC, updated_at DESC
       `).all();
 
       // Try to get active projects from hlg.db if it exists
