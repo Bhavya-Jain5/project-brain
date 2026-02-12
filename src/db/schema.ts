@@ -67,6 +67,15 @@ CREATE TABLE IF NOT EXISTS claude_notes (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Feature Requests: track ideas for new tables, tools, schema changes
+CREATE TABLE IF NOT EXISTS feature_requests (
+    id TEXT PRIMARY KEY,
+    requested_by TEXT NOT NULL DEFAULT 'unknown',
+    request_type TEXT NOT NULL,
+    description TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_claude_notes_source ON claude_notes(source);
 CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
