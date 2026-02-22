@@ -46,6 +46,20 @@ export function registerSearchTools(server: McpServer): void {
         }
       }
 
+      // Update access tracking for returned memories
+      if (result.memories && result.memories.length > 0) {
+        const updateAccess = db.prepare(`
+          UPDATE memories SET
+            access_count = access_count + 1,
+            last_accessed_at = datetime('now'),
+            decay_score = MIN(1.0, COALESCE(decay_score, 1.0) + 0.1)
+          WHERE id = ?
+        `);
+        for (const mem of result.memories as { id: string }[]) {
+          updateAccess.run(mem.id);
+        }
+      }
+
       if (searchTypes.includes("entity")) {
         try {
           result.entities = db.prepare(`
@@ -128,6 +142,20 @@ export function registerSearchTools(server: McpServer): void {
             ORDER BY updated_at DESC
             LIMIT ?
           `).all(`%${query}%`, `%${query}%`, `%${query}%`, maxResults);
+        }
+
+        // Update access tracking for returned memories
+        if (memories.length > 0) {
+          const updateAccess = db.prepare(`
+            UPDATE memories SET
+              access_count = access_count + 1,
+              last_accessed_at = datetime('now'),
+              decay_score = MIN(1.0, COALESCE(decay_score, 1.0) + 0.1)
+            WHERE id = ?
+          `);
+          for (const mem of memories as { id: string }[]) {
+            updateAccess.run(mem.id);
+          }
         }
 
         if (memories.length > 0 || entities.length > 0) {

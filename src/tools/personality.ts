@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getDb } from "../db/connection.js";
 import { generateId } from "../utils/id.js";
+import { autoEmbed } from "../utils/embeddings.js";
 
 export function registerPersonalityTools(server: McpServer): void {
   // save_personality_note
@@ -27,6 +28,7 @@ export function registerPersonalityTools(server: McpServer): void {
       `).run(id, content, subcategory, metadata);
 
       const memory = db.prepare("SELECT * FROM memories WHERE id = ?").get(id);
+      autoEmbed(db, "memories", id, content);
       return { content: [{ type: "text" as const, text: JSON.stringify(memory, null, 2) }] };
     }
   );

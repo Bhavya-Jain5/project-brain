@@ -90,16 +90,50 @@ export function registerContextTools(server: McpServer): void {
         } catch { /* FTS query failed, skip */ }
       }
 
+      // Corrections — always load, never forget these
+      const corrections = core.prepare(`
+        SELECT * FROM memories WHERE category = 'correction' AND status = 'active'
+        ORDER BY importance DESC, updated_at DESC LIMIT 50
+      `).all();
+
+      // Today's daily log
+      let dailyLog: unknown = null;
+      let dailyLogItems: unknown[] = [];
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const log = core.prepare(
+          "SELECT * FROM daily_logs WHERE db = 'core' AND log_date = ?"
+        ).get(today) as { id: string } | undefined;
+        if (log) {
+          dailyLog = log;
+          dailyLogItems = core.prepare(
+            "SELECT * FROM daily_log_items WHERE daily_log_id = ? AND status = 'pending' ORDER BY importance DESC"
+          ).all(log.id);
+        }
+      } catch { /* daily_logs not ready yet */ }
+
+      // Last session summary
+      let lastSession: unknown = null;
+      try {
+        lastSession = core.prepare(`
+          SELECT * FROM chat_sessions WHERE db = 'core'
+          ORDER BY started_at DESC LIMIT 1
+        `).get();
+      } catch { /* chat_sessions not ready yet */ }
+
       const context = {
         values,
         hard_constraints: constraints,
         personality,
+        corrections,
         user_facts: userFacts,
         preferences,
         active_projects: activeProjects,
         recent_decisions: recentDecisions,
         recent_learnings: recentLearnings,
         active_blockers: activeBlockers,
+        ...(dailyLog ? { daily_log: { log: dailyLog, pending_items: dailyLogItems } } : {}),
+        ...(lastSession ? { last_session: lastSession } : {}),
         ...(relevant.length > 0 ? { relevant_to_hint: relevant } : {}),
       };
 

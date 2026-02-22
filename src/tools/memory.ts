@@ -2,12 +2,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getDb, type DbName } from "../db/connection.js";
 import { generateId } from "../utils/id.js";
+import { autoEmbed, autoEmbedBatch } from "../utils/embeddings.js";
 
 const dbEnum = z.enum(["core", "therapy", "dnd", "hlg"]);
 
 const categoryEnum = z.enum([
   "fact", "decision", "learning", "preference", "blocker",
-  "observation", "personality", "value", "hard_constraint", "pattern", "action",
+  "observation", "personality", "value", "hard_constraint", "pattern", "action", "correction",
 ]);
 
 interface MemoryRow {
@@ -64,6 +65,7 @@ export function registerMemoryTools(server: McpServer): void {
       `).run(id, content, category, subcategory ?? null, tagsJson, project_id ?? null, importance ?? 3, metadataJson);
 
       const memory = db.prepare("SELECT * FROM memories WHERE id = ?").get(id);
+      autoEmbed(db, "memories", id, content);
       return { content: [{ type: "text" as const, text: JSON.stringify(memory, null, 2) }] };
     }
   );
@@ -127,7 +129,22 @@ export function registerMemoryTools(server: McpServer): void {
       const sql = `SELECT * FROM memories ${where} ORDER BY importance DESC, updated_at DESC LIMIT ? OFFSET ?`;
       params.push(limit ?? 50, offset ?? 0);
 
-      const memories = db.prepare(sql).all(...params);
+      const memories = db.prepare(sql).all(...params) as { id: string }[];
+
+      // Update access tracking for returned memories
+      if (memories.length > 0) {
+        const updateAccess = db.prepare(`
+          UPDATE memories SET
+            access_count = access_count + 1,
+            last_accessed_at = datetime('now'),
+            decay_score = MIN(1.0, COALESCE(decay_score, 1.0) + 0.1)
+          WHERE id = ?
+        `);
+        for (const mem of memories) {
+          updateAccess.run(mem.id);
+        }
+      }
+
       return { content: [{ type: "text" as const, text: JSON.stringify(memories, null, 2) }] };
     }
   );
@@ -242,6 +259,7 @@ export function registerMemoryTools(server: McpServer): void {
 
       const oldUpdated = db.prepare("SELECT * FROM memories WHERE id = ?").get(old_id);
       const newMemory = db.prepare("SELECT * FROM memories WHERE id = ?").get(newId);
+      autoEmbed(db, "memories", newId, new_content);
       return {
         content: [{
           type: "text" as const,
@@ -295,6 +313,7 @@ export function registerMemoryTools(server: McpServer): void {
 
       transaction();
 
+      autoEmbedBatch(db, "memories", items.map((item, i) => ({ id: ids[i], text: item.content })));
       return {
         content: [{
           type: "text" as const,

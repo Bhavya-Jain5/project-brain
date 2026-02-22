@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getDb, type DbName } from "../db/connection.js";
 import { generateId } from "../utils/id.js";
+import { autoEmbed } from "../utils/embeddings.js";
 
 const dbEnum = z.enum(["core", "therapy", "dnd", "hlg"]);
 
@@ -31,6 +32,7 @@ export function registerEntityTools(server: McpServer): void {
       `).run(id, name, type, subtype ?? null, description ?? null, tagsJson, metadataJson);
 
       const entity = db.prepare("SELECT * FROM entities WHERE id = ?").get(id);
+      autoEmbed(db, "entities", id, [name, description].filter(Boolean).join(". "));
       return { content: [{ type: "text" as const, text: JSON.stringify(entity, null, 2) }] };
     }
   );

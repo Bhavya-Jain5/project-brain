@@ -1,6 +1,7 @@
 import Database from "better-sqlite3-multiple-ciphers";
 import type BetterSqlite3 from "better-sqlite3";
 import path from "path";
+import * as sqliteVec from "sqlite-vec";
 
 const DB_NAMES = ["core", "therapy", "dnd", "hlg"] as const;
 export type DbName = (typeof DB_NAMES)[number];
@@ -28,6 +29,9 @@ export function getDb(name: DbName): BetterSqlite3.Database {
   if (password) {
     db.pragma(`key='${password}'`);
   }
+
+  // Load sqlite-vec extension for vector search
+  sqliteVec.load(db);
 
   // Performance pragmas
   db.pragma("journal_mode = WAL");

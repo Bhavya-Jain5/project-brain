@@ -25,6 +25,25 @@ import { registerClaudeNoteTools } from "./tools/claude-notes.js";
 import { registerTimeTools } from "./tools/time.js";
 import { registerFeatureRequestTools } from "./tools/feature-requests.js";
 import { registerHandoffTools } from "./tools/handoff.js";
+import { registerDailyLogTools } from "./tools/daily-logs.js";
+import { registerChatSessionTools } from "./tools/chat-sessions.js";
+import { registerSmartMemoryTools } from "./tools/smart-memory.js";
+import { registerResourceTools } from "./tools/resources.js";
+import { registerNoteTools } from "./tools/notes.js";
+import { registerTimelineTools } from "./tools/timeline.js";
+import { registerSummaryTools } from "./tools/summaries.js";
+import { registerConfigTools } from "./tools/config.js";
+import { registerTemplateTools } from "./tools/templates.js";
+import { registerGddTools } from "./tools/gdd.js";
+import { registerTherapyPatternTools } from "./tools/therapy-patterns.js";
+import { registerVectorSearchTools } from "./tools/vector-search.js";
+import { registerQueryLogTools } from "./tools/query-log.js";
+import { registerHlgSystemTools } from "./tools/hlg-systems.js";
+import { registerHlgTaskTools } from "./tools/hlg-tasks.js";
+import { registerHlgWorkTools } from "./tools/hlg-work.js";
+import { registerHlgBootstrapTools } from "./tools/hlg-bootstrap.js";
+import { registerHlgFeatureRequestTools } from "./tools/hlg-feature-requests.js";
+import { registerCoordinationTools } from "./tools/coordination.js";
 
 /**
  * Create a fully configured MCP server instance with all tools registered.
@@ -48,6 +67,25 @@ function createServer(): McpServer {
   registerTimeTools(server);
   registerFeatureRequestTools(server);
   registerHandoffTools(server);
+  registerDailyLogTools(server);
+  registerChatSessionTools(server);
+  registerSmartMemoryTools(server);
+  registerResourceTools(server);
+  registerNoteTools(server);
+  registerTimelineTools(server);
+  registerSummaryTools(server);
+  registerConfigTools(server);
+  registerTemplateTools(server);
+  registerGddTools(server);
+  registerTherapyPatternTools(server);
+  registerVectorSearchTools(server);
+  registerQueryLogTools(server);
+  registerHlgSystemTools(server);
+  registerHlgTaskTools(server);
+  registerHlgWorkTools(server);
+  registerHlgBootstrapTools(server);
+  registerHlgFeatureRequestTools(server);
+  registerCoordinationTools(server);
 
   return server;
 }
