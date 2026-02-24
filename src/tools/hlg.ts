@@ -211,4 +211,43 @@ export function registerHlgTools(server: McpServer): void {
       return { content: [{ type: "text" as const, text: JSON.stringify(usage, null, 2) }] };
     }
   );
+
+  // get_modules
+  server.tool(
+    "get_modules",
+    "List registered modules with optional filters (category, maturity, name search, tags)",
+    {
+      category: z.enum(["core", "game_feel", "ui", "meta"]).optional().describe("Filter by category"),
+      maturity: z.enum(["prototype", "alpha", "beta", "stable", "deprecated"]).optional().describe("Filter by maturity level"),
+      name: z.string().optional().describe("Search by name (partial match)"),
+      tag: z.string().optional().describe("Filter by tag (matches within JSON tags array)"),
+    },
+    async ({ category, maturity, name, tag }) => {
+      const db = getDb("hlg");
+      let sql = "SELECT * FROM modules WHERE 1=1";
+      const params: unknown[] = [];
+
+      if (category) {
+        sql += " AND category = ?";
+        params.push(category);
+      }
+      if (maturity) {
+        sql += " AND maturity = ?";
+        params.push(maturity);
+      }
+      if (name) {
+        sql += " AND name LIKE ?";
+        params.push(`%${name}%`);
+      }
+      if (tag) {
+        sql += " AND tags LIKE ?";
+        params.push(`%${tag}%`);
+      }
+
+      sql += " ORDER BY category ASC, name ASC";
+
+      const modules = db.prepare(sql).all(...params);
+      return { content: [{ type: "text" as const, text: JSON.stringify(modules, null, 2) }] };
+    }
+  );
 }
